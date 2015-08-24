@@ -92,6 +92,7 @@ def board_exists? board
     abort("Could not parse JSON file:\n#{e}")
   end
   v_print "Boards cache file read."
+  return false if board.empty?
   bool = boards.include? board
   v_print "board exists:" + bool.to_s
   return bool
@@ -100,8 +101,7 @@ end
 ####################### Command-line parsing #######################
 
 @options = {:verbose => false,
-            :dump => false,
-            :board => "g"}
+            :dump => false}
 
 OptionParser.new do |opts|
   opts.banner = "Usage: #{__FILE__} [options] <search term>"
@@ -113,7 +113,7 @@ OptionParser.new do |opts|
 end.parse!
 
 (puts "Argument needed. Run '#{__FILE__} -h' for more information."; exit) if ARGV.empty?
-
+(puts "Board name needed. Run '#{__FILE__} -h' for more information."; exit) if @options[:board].nil?
 
 ####################### Main Program #######################
 
