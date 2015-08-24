@@ -1,0 +1,122 @@
+#!/usr/bin/env ruby
+# Ruby script that lets you access easily search and open 4chan threads.
+
+require 'open-uri'
+require 'optparse'
+require 'json'
+require 'xdg'
+require 'fileutils'
+
+@cache_folder = File.join(XDG['CACHE'].to_s, "4chan-finder")
+@boards_file = File.join(@cache_folder, 'boards.json')
+
+
+####################### Functions #######################
+
+
+def v_print str # Verbose output
+  puts str if @options[:verbose]
+end
+
+def open_link link # Helps with OS-specific URL opening methods
+  if RbConfig::CONFIG['host_os'] =~ /mswin|mingw|cygwin/
+    system "start #{link}"
+  elsif RbConfig::CONFIG['host_os'] =~ /darwin/
+    system "open #{link}"
+  elsif RbConfig::CONFIG['host_os'] =~ /linux|bsd/
+    system "xdg-open #{link} 2>/dev/null"
+  end
+end
+
+def search_catalog board, search_term
+  begin
+    json = JSON.parse(open("http://a.4cdn.org/#{board}/catalog.json").read) # Error checking done in board_exists?
+  rescue => e
+    abort("An error has occured while checking the 4chan API:\n#{e}")
+  end
+  results = Array.new
+  json.each do |page|
+  page['threads'].select do |thread|
+      next if thread['sub'].nil?
+      results << thread if (thread['sub'].downcase.include? search_term.downcase) || (thread['com'].downcase.include? search_term.downcase)
+      # search in subject AND comment
+    end
+  end
+  results = results.sort_by {|thread| thread["last_replies"][-1]['time']}.reverse! # Put threads in descending order of last reply
+  return results
+end
+
+def create_boards_cache
+
+  puts "Caching the boards list."
+  begin
+    v_print "Attempting to download and parse 4chan boards list..."
+    json = JSON.parse(open("http://a.4cdn.org/boards.json").read)
+  rescue => e
+    abort("An error has occured while checking the 4chan API:\n#{e}")
+  end
+
+  boards = Array.new
+  v_print "Adding boards to array..."
+  json['boards'].each do |board|
+    boards << board['board']
+  end
+  v_print "boards list: #{boards}"
+
+  v_print "Attempting to create cache folder if it's not already present..."
+  begin
+    FileUtils.mkdir_p(@cache_folder)
+  rescue => e
+    abort("Could not create cache directory:\n#{e}")
+  end
+
+  v_print "Attempting to open cache file..."
+  begin
+    File.open(@boards_file, 'w') do |f|
+      v_print "Attempting to write to cache file..."
+      f << boards.to_json
+    end
+  rescue => e
+    abort("Could not write boards cache file:\n#{e}")
+  end
+
+  v_print "Boards cache file successfully created."
+end
+
+def board_exists? board
+  create_boards_cache unless File.exists?(@boards_file)
+  v_print "Boards cache file verified."
+  begin
+    boards = JSON.parse(File.read(@boards_file))
+  rescue => e
+    abort("Could not parse JSON file:\n#{e}")
+  end
+  v_print "Boards cache file read."
+  bool = boards.include? board
+  v_print "board exists:" + bool.to_s
+  return bool
+end
+
+####################### Command-line parsing #######################
+
+@options = {:verbose => false,
+            :dump => false,
+            :board => "g"}
+
+OptionParser.new do |opts|
+  opts.banner = "Usage: #{__FILE__} [options] <search term>"
+  opts.on('-U', '--update-cache', 'Update boards list cache') {create_boards_cache}
+  opts.on('-v', '--verbose', 'Run verbosely') {|v| @options[:verbose] = v}
+  opts.on('-b', '--board [BOARD NAME]', 'Board to search') {|v| @options[:board] = v.downcase.delete("/[]")}
+  opts.on('-d', '--dump-mode', 'Run in dump mode (dumps the result links to STDOUT)') {|v| @options[:dump] = v}
+  opts.on( '-h', '--help', 'Display this screen' ) {puts opts; exit}
+end.parse!
+
+(puts "Argument needed. Run '#{__FILE__} -h' for more information."; exit) if ARGV.empty?
+
+
+####################### Main Program #######################
+
+v_print "Cache folder location is #{@cache_folder}."
+v_print "Boards cache file location is #{@boards_file}."
+
