@@ -30,7 +30,7 @@ end
 
 def search_catalog board, search_term
   begin
-    json = JSON.parse(open("http://a.4cdn.org/#{board}/catalog.json").read) # Error checking done in board_exists?
+    json = JSON.parse(open("http://a.4cdn.org/#{board}/catalog.json").read) # Board availability check done in board_exists?
   rescue => e
     abort("An error has occured while checking the 4chan API:\n#{e}")
   end
@@ -42,6 +42,7 @@ def search_catalog board, search_term
       # search in subject AND comment
     end
   end
+  return nil if results.empty?
   results = results.sort_by {|thread| thread["last_replies"][-1]['time']}.reverse! # Put threads in descending order of last reply
   return results
 end
