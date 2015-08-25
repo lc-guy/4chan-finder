@@ -6,6 +6,7 @@ require 'optparse'
 require 'json'
 require 'xdg'
 require 'fileutils'
+require 'colorize'
 
 @cache_folder = File.join(XDG['CACHE'].to_s, "4chan-finder")
 @boards_file = File.join(@cache_folder, 'boards.json')
@@ -14,8 +15,8 @@ require 'fileutils'
 ####################### Functions #######################
 
 
-def v_print str # Verbose output
-  puts str if @options[:verbose]
+def v_print str, newline = true # Verbose output
+  newline ? (puts str if @options[:verbose]) : (print str if @options[:verbose])
 end
 
 def open_link link # Helps with OS-specific URL opening methods
@@ -28,15 +29,19 @@ def open_link link # Helps with OS-specific URL opening methods
   end
 end
 
-def search_catalog board, search_term
+def search_catalog board, search_term, limit
+  v_print "Attempting to download and parse board catalog... ", false
   begin
     json = JSON.parse(open("http://a.4cdn.org/#{board}/catalog.json").read) # Board availability check done in board_exists?
+    v_print "Done.".green
   rescue => e
     abort("An error has occured while checking the 4chan API:\n#{e}")
   end
   results = Array.new
   json.each do |page|
+    break if results.size == limit
     page['threads'].select do |thread|
+      break if results.size == limit
       results << thread if (thread['com'].downcase.include? search_term.downcase if thread['com']) || (thread['sub'].downcase.include? search_term.downcase if thread['sub'])
       # This checks if the thread has a comment or a subject before trying to work with it
     end
@@ -46,53 +51,60 @@ def search_catalog board, search_term
 end
 
 def create_boards_cache
-  puts "Caching the boards list."
+  v_print "Caching the boards list.".yellow
   begin
-    v_print "Attempting to download and parse 4chan boards list..."
+    v_print "Attempting to download and parse 4chan boards list... ", false
     json = JSON.parse(open("http://a.4cdn.org/boards.json").read)
+    v_print "Done.".green
   rescue => e
-    abort("An error has occured while checking the 4chan API:\n#{e}")
+    abort("An error has occured while checking the 4chan API:\n".red + "#{e}")
   end
 
   boards = Array.new
-  v_print "Adding boards to array..."
+  v_print "Adding boards to array... ", false
   json['boards'].each do |board|
     boards << board['board']
   end
-  v_print "boards list: #{boards}"
+  v_print "Done.".green
+  v_print "Boards list: " + "#{boards}".light_black
 
-  v_print "Attempting to create cache folder if it's not already present..."
+  v_print "Attempting to create cache folder if it's not already present... ", false
   begin
     FileUtils.mkdir_p(@cache_folder)
+    v_print "Done.".green
   rescue => e
-    abort("Could not create cache directory:\n#{e}")
+    abort("Could not create cache directory:\n".red + "#{e}")
   end
 
-  v_print "Attempting to open cache file..."
+  v_print "Attempting to open cache file... ", false
   begin
     File.open(@boards_file, 'w') do |f|
-      v_print "Attempting to write to cache file..."
+      v_print "Done.".green
+      v_print "Attempting to write to cache file... ", false
       f << boards.to_json
+      v_print "Done.".green
     end
   rescue => e
-    abort("Could not write boards cache file:\n#{e}")
+    abort("Could not write boards cache file:\n".red + "#{e}")
   end
 
-  v_print "Boards cache file successfully created."
+  v_print "Boards cache file successfully created.".green
 end
 
 def board_exists? board
   create_boards_cache unless File.exists?(@boards_file)
-  v_print "Boards cache file verified."
+  v_print "Boards cache file verified.".green
+  v_print "Attempting to parse JSON boards cache... ", false
   begin
     boards = JSON.parse(File.read(@boards_file))
+    v_print "Done.".green
   rescue => e
-    abort("Could not parse JSON file:\n#{e}")
+    abort("Could not parse JSON file:\n".red + "#{e}")
   end
-  v_print "Boards cache file read."
+  v_print "Boards cache file read.".green
   return false if board.empty?
   bool = boards.include? board
-  v_print "board exists:" + bool.to_s
+  v_print "Board exists: " + (bool ? bool.to_s.green : bool.to_s.red)
   return bool
 end
 
@@ -100,48 +112,51 @@ end
 
 @options = {:verbose => false,
             :dump => false,
-            :limit => "10"}
+            :limit => "10",
+            :update_cache => false}
 
 OptionParser.new do |opts|
-  opts.banner = "Usage: #{__FILE__} [options] <search term>"
-  opts.on('-U', '--update-cache', 'Update boards list cache') {create_boards_cache}
+  opts.banner = "Usage:" + " #{__FILE__}".yellow + " [options] ".blue + "<search term>".green
   opts.on('-v', '--verbose', 'Run verbosely') {|v| @options[:verbose] = v}
   opts.on('-b', '--board [BOARD NAME]', 'Board to search') {|v| @options[:board] = v.downcase.delete("/[]")}
   opts.on('-d', '--dump-mode', 'Run in dump mode (dumps the result links directly for easy piping)') {|v| @options[:dump] = v}
   opts.on('-l', '--limit [NUMBER]', 'Number of results limit') {|v| @options[:limit] = v}
+  opts.on('-U', '--update-cache', 'Update boards list cache') {|v| @options[:update_cache] = v}
   opts.on( '-h', '--help', 'Display this screen' ) {puts opts; exit}
 end.parse!
 
-(puts "Argument needed. Run '#{__FILE__} -h' for more information."; exit) if ARGV.empty?
-(puts "Board name needed. Run '#{__FILE__} -h' for more information."; exit) if @options[:board].nil?
+(puts "Argument needed.".red + " Run '" + "#{__FILE__} -h".yellow + "' for more information."; exit) if ARGV.empty?
+(puts "Board name needed.".red + " Run '" + "#{__FILE__} -h".yellow + "' for more information."; exit) if @options[:board].nil?
 
-(puts "Error: limit should be an integer."; exit) unless @options[:limit].to_i.to_s == @options[:limit]
-(puts "Error: limit should be superior to 0."; exit) if @options[:limit].to_i == 0
+(puts "Error:".red + " limit should be an integer."; exit) unless @options[:limit].to_i.to_s == @options[:limit]
+(puts "Error:".red + " limit should be superior to 0."; exit) if @options[:limit].to_i == 0
+
 @options[:limit] = Integer(@options[:limit])
+create_boards_cache if @options[:update_cache]
 
 
 ####################### Main Program #######################
 
 
-v_print "Cache folder location is #{@cache_folder}."
-v_print "Boards cache file location is #{@boards_file}."
+v_print "Cache folder location is " + "#{@cache_folder}.".yellow
+v_print "Boards cache file location is " + "#{@boards_file}.".yellow
 
-v_print "Verifying board exists."
+v_print "Verifying board exists.".yellow
 unless board_exists? @options[:board]
-  puts "The board entered is not a valid 4chan board. If the board does exist " +
-       "or has been created recently, try using the -U flag with your command."
+  puts "The board entered is not a valid 4chan board.".red + " If the board does exist " +
+       "or has been created recently, try using the " + "-U".yellow + " flag with your command."
   exit
 end
 
 v_print "Searching for #{ARGV[0]} on board #{@options[:board]} with a limit of #{@options[:limit]} threads."
-results = search_catalog(@options[:board], ARGV[0])
+results = search_catalog(@options[:board], ARGV[0], @options[:limit])
 
 if @options[:dump]
   exit if results.nil?
-  results.take(@options[:limit]).each do |thread|
+  results.each do |thread|
     puts "http://boards.4chan.org/" + @options[:board] + "/thread/" + thread['no'].to_s
   end
 else
-  puts "Use the --dump-mode flag for the moment."
-  (puts "No results found."; exit) if results.nil?
+  puts "Use the --dump-mode flag for the moment.".yellow
+  (puts "No results found.".red; exit) if results.nil?
 end
