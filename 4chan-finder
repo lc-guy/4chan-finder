@@ -45,12 +45,13 @@ def search_catalog board, search_term, limit
     abort("An error has occured while checking the 4chan API:\n#{e}")
   end
   results = Array.new
-  json.each do |page|
-    break if results.size == limit
-    page['threads'].select do |thread|
-      break if results.size == limit
-      results << thread if (thread['com'].downcase.include? search_term.downcase if thread['com']) || (thread['sub'].downcase.include? search_term.downcase if thread['sub'])
+  catch :limit_reached do
+    json.each do |page|
+      page['threads'].select do |thread|
+        throw :limit_reached if results.size == limit
+        results << thread if (thread['com'].downcase.include? search_term.downcase if thread['com']) || (thread['sub'].downcase.include? search_term.downcase if thread['sub'])
       # This checks if the thread has a comment or a subject before trying to work with it
+      end
     end
   end
   return nil if results.empty?
