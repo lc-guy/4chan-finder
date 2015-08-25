@@ -7,14 +7,15 @@ Usage: ./4chan-finder [options] <search term>
     -U, --update-cache               Update boards list cache
     -v, --verbose                    Run verbosely
     -b, --board [BOARD NAME]         Board to search
-    -i, --interactive                Run in interactive mode
+    -d, --dump-mode                  Run in dump mode (dumps the result links directly for easy piping)
+    -l, --limit [NUMBER]             Number of results limit
     -h, --help                       Display this screen
 ```
 
 ## TODO
-* Make it work
+* ~~Make it work~~
 * Make it interactive (Display a small snippet of the OP, the last reply date, and allow the user to choose the thread he wants to access if multiple results are present)
-* Implement dump mode (easy)
+* ~~Implement dump mode (easy)~~
 
 ## Dependencies 
 * The xdg gem is necessary for handling config and cache folders location. To install it, enter `[sudo] gem install xdg`.
