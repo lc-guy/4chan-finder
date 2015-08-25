@@ -7,6 +7,8 @@ require 'json'
 require 'xdg'
 require 'fileutils'
 require 'colorize'
+require 'nokogiri'
+require 'io/console'
 
 @cache_folder = File.join(XDG['CACHE'].to_s, "4chan-finder")
 @boards_file = File.join(@cache_folder, 'boards.json')
@@ -17,6 +19,11 @@ require 'colorize'
 
 def v_print str, newline = true # Verbose output
   newline ? (puts str if @options[:verbose]) : (print str if @options[:verbose])
+end
+
+def is_integer? str
+  raise TypeError, "Input should be a string" unless str.is_a?(String)
+  str.to_i.to_s == str
 end
 
 def open_link link # Helps with OS-specific URL opening methods
@@ -108,6 +115,56 @@ def board_exists? board
   return bool
 end
 
+def dump_view threads, board
+  exit if threads.nil?
+  threads.each do |thread|
+    url = "http://boards.4chan.org/" + board + "/thread/" + thread['no'].to_s
+    puts url
+  end
+end
+
+def interactive_view threads, board
+  (puts "No results found.".red; exit) if threads.nil?
+  if threads.size == 1
+    thread = threads[0]
+    url = "http://boards.4chan.org/" + board + "/thread/" + thread['no'].to_s
+    if thread['sub'].nil?
+      pick = Nokogiri::HTML(Nokogiri::HTML(thread['com']).to_html.gsub("<br>", " ")).text
+    else
+      pick = Nokogiri::HTML(Nokogiri::HTML(thread['sub']).to_html.gsub("<br>", " ")).text
+    end
+
+    puts "#{url.light_black} - #{pick[0..59]}#{"..." unless pick.length <= 60} " + "[Replies: #{thread['replies'].to_s}]".yellow
+    print "View thread? [" + "Y".green + "/" + "N".red + "] "
+    answer = STDIN.getch.downcase
+    puts answer
+    answer == 'y' ? (puts "Opening thread." ; open_link(url)) : exit
+  else
+    counter = 0 # Keeping count for thread choice
+
+    threads.each do |thread|
+      if thread['sub'].nil? # Block preferably chooses subject and comment if there's none
+        pick = Nokogiri::HTML(Nokogiri::HTML(thread['com']).to_html.gsub("<br>", " ")).text.delete("\n")
+      else
+        pick = Nokogiri::HTML(Nokogiri::HTML(thread['sub']).to_html.gsub("<br>", " ")).text.delete("\n")
+      end
+
+      url = "http://boards.4chan.org/" + board + "/thread/" + thread['no'].to_s
+      counter += 1
+      puts "#{url.light_black} - #{pick[0..59]}#{"..." unless pick.length <= 60} " + "[Replies: #{thread['replies'].to_s}] ".yellow + "(#{counter.to_s})".blue
+    end
+
+    print "\nWhich thread do you want to open? [" + "#{"1".green} - #{counter.to_s.green}" + "] "
+    answer = STDIN.gets.chomp
+
+    exit unless is_integer? answer
+    exit unless answer.to_i.between?(1, counter) # Verify answer isn't out of bounds
+
+    puts "Opening thread n°#{answer}."
+    open_link("http://boards.4chan.org/" + board + "/thread/" + threads[answer.to_i-1]['no'].to_s)
+  end
+end
+
 ####################### Command-line parsing #######################
 
 @options = {:verbose => false,
@@ -128,7 +185,7 @@ end.parse!
 (puts "Argument needed.".red + " Run '" + "#{__FILE__} -h".yellow + "' for more information."; exit) if ARGV.empty?
 (puts "Board name needed.".red + " Run '" + "#{__FILE__} -h".yellow + "' for more information."; exit) if @options[:board].nil?
 
-(puts "Error:".red + " limit should be an integer."; exit) unless @options[:limit].to_i.to_s == @options[:limit]
+(puts "Error:".red + " limit should be an integer."; exit) unless is_integer?(@options[:limit])
 (puts "Error:".red + " limit should be superior to 0."; exit) if @options[:limit].to_i == 0
 
 @options[:limit] = Integer(@options[:limit])
@@ -152,11 +209,7 @@ v_print "Searching for #{ARGV[0]} on board #{@options[:board]} with a limit of #
 results = search_catalog(@options[:board], ARGV[0], @options[:limit])
 
 if @options[:dump]
-  exit if results.nil?
-  results.each do |thread|
-    puts "http://boards.4chan.org/" + @options[:board] + "/thread/" + thread['no'].to_s
-  end
+  dump_view(results, @options[:board])
 else
-  puts "Use the --dump-mode flag for the moment.".yellow
-  (puts "No results found.".red; exit) if results.nil?
+  interactive_view(results, @options[:board])
 end
