@@ -21,10 +21,16 @@ Usage: ./4chan-finder [options] <search term>
 This is now in a working state. Future changes will probably only be bugfixes or feature requests.
 
 ## Dependencies 
-* Ruby Versions older than 1.9.3 are not supported (releases older than 2011).
+
+Ruby Versions older than 1.9.3 are not supported (releases older than 2011).
+
+To easily install the dependencies, install bundler if you don't have it already (`[sudo] gem install bundler`) and simply `bundle install` inside the directory.
+
+If you prefer to manually install the dependencies, here they are:
+
 * The xdg gem is necessary for handling config and cache folders location. To install it, enter `[sudo] gem install xdg`.
 * The colorize gem is necessary for output generation. To install it, enter `[sudo] gem install colorize`.
-* The nokogiri gem is necessary for cleaning the 4chan api's output. To install it, enter `[sudo] gem install nokogiri`.
+* The nokogiri gem is necessary for cleaning 4chan api's output. To install it, enter `[sudo] gem install nokogiri`.
 
 ## Contact
 * e-mail: aptyget@gmail.com
