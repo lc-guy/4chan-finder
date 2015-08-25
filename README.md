@@ -12,6 +12,9 @@ Usage: ./4chan-finder [options] <search term>
     -h, --help                       Display this screen
 ```
 
+## Screenshot
+![Screenshot of interface](http://u.xpo.pw/Zvh.png)
+
 ## TODO
 * ~~Make it work~~
 * ~~Implement dump mode (easy)~~
