@@ -36,5 +36,4 @@ If you prefer to manually install the dependencies, here they are:
 * The nokogiri gem is necessary for cleaning 4chan api's output. To install it, enter `[sudo] gem install nokogiri`.
 
 ## Contact
-* e-mail: aptyget@gmail.com
-* IRC: apt-get on SynIRC and Rizon
+* IRC: apt-get on SynIRC, Rizon, and Freenode
